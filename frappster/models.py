@@ -1,6 +1,7 @@
 from typing import List
 from typing import Optional
 from datetime import datetime
+
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
@@ -11,6 +12,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+
 from frappster.types import AccessRole, AccountType
 
 class Base(DeclarativeBase):
