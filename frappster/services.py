@@ -1,13 +1,14 @@
+from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 
 from frappster.models import User
 from frappster.database import DatabaseManager
-from frappster.types import ROLE_PERMISSIONS, Permissions
-from frappster.utils import hash_password, verify_password
-from frappster.errors import (DatabaseError, 
+from frappster.types import ROLE_PERMISSIONS, AccessRole, Permissions
+from frappster.utils import hash_password, is_too_many_login_attempts, reset_login_attempts, verify_password
+from frappster.errors import (DatabaseError, GeneralError, 
                               InvalidPasswordError,
-                              InvalidPasswordOrIDError,
-                              PermissionDeniedError,
+                              InvalidPasswordOrIDError, LoginTimeoutError,
+                              PermissionDeniedError, TooManyLoginAttemptsError,
                               UserNotFoundError,
                               UserNotLoggedInError,
                               )
@@ -19,7 +20,8 @@ class AuthService:
     def __init__(self, db_manager:DatabaseManager) -> None:
         self.current_user: User | None = None
         self.db_manager = db_manager
-        self.login_attempts = 0
+        self.max_login_attempts = 3
+        self.max_login_timeout_seconds = 30
 
     def update_own_password(self, old_password:str, new_password:str):
         self.db_manager.open_session()
@@ -77,8 +79,7 @@ class AuthService:
 
     def login_user(self, user_id:int, password:str):
         if self.current_user is not None:
-            print("Oh NO User already logged in")
-            raise
+            raise GeneralError("Oh no user already logged in, but trying to login ")
 
         self.db_manager.open_session()
         try:
@@ -91,18 +92,32 @@ class AuthService:
             if user is None:
                 # Generic error for login sequence
                 raise InvalidPasswordOrIDError
-            
+
+            if not reset_login_attempts(user.last_login,
+                                        self.max_login_timeout_seconds):
+                raise LoginTimeoutError
+             
+            if is_too_many_login_attempts(user.login_attempts,
+                                          self.max_login_attempts): 
+                raise TooManyLoginAttemptsError
+
             if not verify_password(password, user.password):
                 # Generic error for login sequence
+                user.login_attempts += 1
                 raise InvalidPasswordOrIDError
+
+            # successsfull login
+            user.login_attempts = 0
+            user.last_login = datetime.now()
+            self.current_user = user
+            self.db_manager.commit()
 
         except SQLAlchemyError as e:
             self.db_manager.rollback()
             raise DatabaseError(f"Database error occurred: {e}")
 
         else:
-            self.current_user = user
-            return True # successssss
+            return True 
 
         finally:
             self.db_manager.close_session()
@@ -110,15 +125,26 @@ class AuthService:
 
     def logout_user(self, user_id: int | None = None):
         if user_id is None:
-            # Normal, then a normal user is using this
-            # So current user is logged out.
-            self.current_user = None
+            # normal user logout
+            if self.current_user is None:
+                raise UserNotLoggedInError("No user is currently logged in.")
+            self.current_user = None  # Log out the current user
 
-        elif user_id is not None:
-            # Then Permisions should be checked
-            # Admin or employee is trying to logout 
-            # another user. Needs to have an state variable in db
-            pass
+        else:
+            # Admin initiated logout for another user
+            # check if current user has permissions
+            if not self.has_permission(Permissions.MANAGE_USERS) and not self.is_admin():
+                raise PermissionDeniedError("Insufficient permissions to log out another user.")
+
+            # TODO: check user state in db if that user is logged in
+            # TODO: log this action for audit_logs
+
+    def is_admin(self) -> bool:
+        user = self.current_user
+        if user is not None:
+            if user.access_role == AccessRole.ADMIN:
+                return True
+        return False
 
     def has_permission(self, permission:Permissions) -> bool:
         user = self.current_user
@@ -129,7 +155,11 @@ class AuthService:
         return False
 
 class UserManager:
-    """Handles user actions"""
+    """Handles user actions
+    Admin can manage all users.
+    Employees can manage customers. 
+    Customers can't manage anyone.
+    """
     def __init__(self, 
                  db_manager:DatabaseManager,
                  auth_service:AuthService) -> None:
@@ -140,18 +170,25 @@ class UserManager:
         if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
             raise PermissionDeniedError
 
+        if 'access_role' in kwargs and kwargs['access_role'] == AccessRole.ADMIN:
+            if not self.auth_service.is_admin():
+                raise PermissionDeniedError
+
         self.db_manager.open_session()
         try:
             new_user = User(**kwargs)
             
             if 'password' in kwargs:
                 new_user.password = hash_password(kwargs['password'])
+
             self.db_manager.create(new_user)
             self.db_manager.commit()
+
 
         except SQLAlchemyError as e:
             self.db_manager.rollback()
             raise DatabaseError(f"Database error occurred: {e}")
+
         else:
             return new_user.id
             
@@ -163,12 +200,15 @@ class UserManager:
         if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
             raise PermissionDeniedError
 
+        if not self.auth_service.is_admin() and user.access_role == AccessRole.ADMIN:
+            raise PermissionDeniedError
+
         self.db_manager.open_session()
         try:
 
             self.db_manager.session.merge(user)
             self.db_manager.commit()
-
+           
         except SQLAlchemyError as e:
             self.db_manager.rollback()
             raise DatabaseError(f"Database error occurred: {e}")

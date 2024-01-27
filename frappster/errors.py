@@ -39,3 +39,11 @@ class UserNotLoggedInError(Exception):
 
 class DatabaseError(Exception):
     pass
+
+class TooManyLoginAttemptsError(Exception):
+    def __str__(self):
+        return f"Locked. Too many login attempts"
+
+class LoginTimeoutError(Exception):
+    def __str__(self):
+        return f"Login attempts locked. Please try again later"
