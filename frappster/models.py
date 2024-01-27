@@ -15,10 +15,10 @@ from sqlalchemy.orm import relationship
 
 from frappster.types import AccessRole, AccountType
 
-class Base(DeclarativeBase):
+class BaseModel(DeclarativeBase):
     pass
 
-class User(Base):
+class User(BaseModel):
     __tablename__ = 'users'
     
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,7 +41,7 @@ class User(Base):
                                                      order_by="Account.id",
                                                      back_populates="user")
 
-class Account(Base):
+class Account(BaseModel):
     __tablename__ = 'accounts'
     
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -55,7 +55,7 @@ class Account(Base):
     # The cool stuff
     user: Mapped["User"] = relationship("User",
                                         back_populates="accounts")
-class Transaction(Base):
+class Transaction(BaseModel):
     __tablename__ = 'transactions'
 
     id: Mapped[int] = mapped_column(primary_key=True)
