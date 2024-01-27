@@ -29,9 +29,9 @@ class User(Base):
     address: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(100))
     phone_number: Mapped[str] = mapped_column(String(30))
-    username: Mapped[str] = mapped_column(String(30))
     password: Mapped[str] = mapped_column(String(100))
     access_role: Mapped[AccessRole] = mapped_column(SQLEnum(AccessRole))
+    last_login: Mapped[datetime] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
     
