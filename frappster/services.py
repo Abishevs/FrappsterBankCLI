@@ -4,7 +4,7 @@ from frappster.auth import AbstractAuthService
 from frappster.models import User
 from frappster.database import AbstractDatabaseManager
 from frappster.types import AccessRole, Permissions
-from frappster.utils import hash_password
+from frappster.utils import hash_password, requires_permissions, requires_role
 from frappster.errors import (DatabaseError, 
                               PermissionDeniedError, 
                               UserNotFoundError,
@@ -23,10 +23,9 @@ class UserManager:
         self.db_manager = db_manager
         self.auth_service = auth_service
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_USERS)
     def create_user(self, **kwargs) -> int:
-        if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
-            raise PermissionDeniedError
-
         if 'access_role' in kwargs and kwargs['access_role'] == AccessRole.ADMIN:
             if not self.auth_service.is_admin():
                 raise PermissionDeniedError
@@ -52,11 +51,10 @@ class UserManager:
         finally:
             self.db_manager.close_session()
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_USERS, Permissions.UPDATE_USER)
     def update_user(self, user: User):
         """Get user is used to fetch that user"""
-        if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
-            raise PermissionDeniedError
-
         if not self.auth_service.is_admin() and user.access_role == AccessRole.ADMIN:
             raise PermissionDeniedError
 
@@ -76,14 +74,22 @@ class UserManager:
         finally:
             self.db_manager.close_session()
 
-    def delete_user(self):
+    @requires_role(AccessRole.ADMIN)
+    @requires_permissions(Permissions.MANAGE_USERS, Permissions.DELETE_USER)
+    def delete_user(self, user: User):
         if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
             raise PermissionDeniedError
+
+        if not self.auth_service.is_admin() and user.access_role == AccessRole.ADMIN:
+            raise PermissionDeniedError
+
+
+            
         pass
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_USERS, Permissions.VIEW_USER)
     def get_user(self, user_id:int):
-        if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
-            raise PermissionDeniedError
 
         self.db_manager.open_session()
         try:
@@ -100,16 +106,29 @@ class UserManager:
 
 class AccountService:
     """Handles user account related tasks"""
-    def __init__(self, db_manager:AbstractDatabaseManager) -> None:
+    def __init__(self, 
+                 db_manager:AbstractDatabaseManager,
+                 auth_service: AbstractAuthService
+                 ) -> None:
         self.db_manager = db_manager
+        self.auth_service = auth_service
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.CREATE_ACCOUNT)
     def create_account(self):
+        print("Creating account")
         pass
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.CLOSE_ACCOUNT)
     def close_account(self):
+        print("Closing account")
         pass
 
+    @requires_role(AccessRole.EMPLOYEE)
+    @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.VIEW_ACCOUNT)
     def get_account_details(self):
+        print("Getting account details")
         pass
 
 class TransactionService:
@@ -123,6 +142,8 @@ class TransactionService:
     def make_withdrawal(self):
         pass
 
-    def transfer_funds(self, sender:User, reciever:User):
+    @requires_role(AccessRole.CUSTOMER)
+    @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.INITIATE_OWN_TRANSACTION)
+    def initate_transaction(self, senders_account_id, recievers_account_id):
         pass
 

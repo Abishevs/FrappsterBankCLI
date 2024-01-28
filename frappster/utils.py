@@ -1,6 +1,9 @@
 import bcrypt
 from datetime import datetime, timedelta
 
+from frappster.errors import PermissionDeniedError
+from frappster.types import AccessRole
+
 def hash_password(password):
     salt = bcrypt.gensalt()
     hashed_password = bcrypt.hashpw(password.encode('utf-8'),
@@ -17,3 +20,37 @@ def is_too_many_login_attempts(login_attempts: int, max_attempts: int = 3):
 def reset_login_attempts(last_attempt: datetime, max_time_seconds: int = 30):
     time_diff = datetime.now() - last_attempt
     return time_diff > timedelta(minutes=max_time_seconds)
+
+def requires_role(minimum_role):
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            if not hasattr(self, 'auth_service') or self.auth_service is None:
+                raise AttributeError("AuthService instance is required for role check")
+
+            current_user_role = self.auth_service.current_user.access_role
+            if current_user_role.value < minimum_role.value:
+                raise PermissionDeniedError
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
+
+def requires_permissions(*required_permissions):
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            if not hasattr(self, 'auth_service') or self.auth_service is None:
+                raise AttributeError("AuthService instance is required for permissions check")
+
+            permissions_to_check = required_permissions
+            # Unpack permissions if passed as a single list in args
+            if len(args) > 0 and isinstance(args[0], list):
+                permissions_to_check = args[0]
+                args = args[1:]
+
+            for permission in permissions_to_check:
+                if not self.auth_service.has_permission(permission):
+                    raise PermissionDeniedError
+
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator
+
