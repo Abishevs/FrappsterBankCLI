@@ -2,10 +2,12 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Type, Union
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.orm.session import Session
 
 from frappster.models import Account, BaseModel, Transaction, User
+from frappster.types import AccessRole
+from frappster.utils import hash_password
 
 class AbstractDatabaseManager(ABC):
     @abstractmethod
@@ -69,10 +71,37 @@ class AbstractDatabaseManager(ABC):
         pass
 
 class DatabaseManager(AbstractDatabaseManager):
-    def __init__(self, db_url="sqlite:///test.db"):
-        self.engine = create_engine(db_url, echo=True)
+    def __init__(self, db_url="sqlite:///test.db", echo=False):
+        self.engine = create_engine(db_url, echo=echo)
         BaseModel.metadata.create_all(self.engine) 
         self.Session = sessionmaker(bind=self.engine)
+
+    def create_super_admin(self):
+        self.open_session()
+        admin_count = self.session.query(User).filter_by(access_role=AccessRole.ADMIN).count()
+
+        if admin_count == 0:
+            super_admin = User(
+                login_id=42069,  
+                first_name="Anorak",
+                last_name="Watts",
+                email="superadmin@cli-banksystem.se",
+                phone_number="4324134232",
+                address="FERTISILE 32 st",
+                password=hash_password("secure"),
+                access_role=AccessRole.ADMIN
+            )
+            self.session.add(super_admin)
+            try:
+                self.commit()
+                print("Super admin account created.")
+            except Exception as e:
+                print(f"Error creating super admin: {e}")
+                self.rollback()
+            finally:
+                self.close_session()
+        else:
+            print("Super admin account already exists.")
 
     def open_session(self):
         self.session = self.Session()
@@ -95,7 +124,7 @@ class DatabaseManager(AbstractDatabaseManager):
         self.session.delete(record)
 
     def get_one(self, model, record_id):
-        return self.session.query(model).get(record_id)
+        return self.session.query(model).options(joinedload('*')).filter_by(login_id=record_id).first()
 
     def get_all(self, model):
         return self.session.query(model).all()

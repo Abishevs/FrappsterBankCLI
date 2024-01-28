@@ -1,4 +1,5 @@
 import bcrypt
+import random
 from datetime import datetime, timedelta
 
 from frappster.errors import PermissionDeniedError
@@ -19,7 +20,7 @@ def is_too_many_login_attempts(login_attempts: int, max_attempts: int = 3):
 
 def reset_login_attempts(last_attempt: datetime, max_time_seconds: int = 30):
     time_diff = datetime.now() - last_attempt
-    return time_diff > timedelta(minutes=max_time_seconds)
+    return time_diff >= timedelta(seconds=max_time_seconds)
 
 def requires_role(minimum_role):
     def decorator(func):
@@ -46,11 +47,21 @@ def requires_permissions(*required_permissions):
                 permissions_to_check = args[0]
                 args = args[1:]
 
+            has_permision = False
+            # If has atleast one given permsion, proceeeed
             for permission in permissions_to_check:
-                if not self.auth_service.has_permission(permission):
-                    raise PermissionDeniedError
+                if self.auth_service.has_permission(permission):
+                    has_permision = True
 
+            # if has none welp bye bye
+            if not has_permision:
+                raise PermissionDeniedError
+
+            print("hhhhhhh")
             return func(self, *args, **kwargs)
         return wrapper
     return decorator
+
+def gen_randomrange(digits=6):
+    return random.randrange(111111, 999999, digits)
 

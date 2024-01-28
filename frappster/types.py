@@ -1,9 +1,9 @@
 from enum import Enum, auto
 
 class AccountType(Enum):
-    SAVINGS = auto()
-    CHECKING = auto()
-    BUSINESS = auto()
+    SAVINGS = 10
+    CHECKINGS = 20
+    BUSINESS = 30
 
 class AccessRole(Enum):
     CUSTOMER = 1
@@ -51,7 +51,7 @@ ROLE_PERMISSIONS = {
                        Permissions.VIEW_ERROR_LOGS,
                        ],
     AccessRole.EMPLOYEE: [Permissions.MANAGE_USERS,
-                          Permissions.MANAGE_USERS,
+                          Permissions.MANAGE_ACCOUNTS,
                           Permissions.VIEW_ALL_TRANSACTIONS,
                           Permissions.INITIATE_TRANSACTION,
                           ],

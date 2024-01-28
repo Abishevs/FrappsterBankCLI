@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from frappster.database import DatabaseManager
-from frappster.models import User
+from frappster.models import User, UserData
 from frappster.types import ROLE_PERMISSIONS, AccessRole, Permissions
 from frappster.utils import (hash_password,
                              verify_password,
@@ -22,6 +22,7 @@ from frappster.errors import (DatabaseError,
                               UserNotLoggedInError)
 
 class AbstractAuthService(ABC):
+    
     @abstractmethod
     def update_own_password(self, old_password:str, new_password:str) -> bool:
         pass
@@ -46,12 +47,13 @@ class AbstractAuthService(ABC):
     def has_permission(self, permission:Permissions) -> bool:
         pass
 
+
 class AuthService(AbstractAuthService):
     """Handles user authenication &
     authorization for roll based access
     """
     def __init__(self, db_manager:DatabaseManager) -> None:
-        self.current_user: User | None = None
+        self.current_user: UserData | None = None
         self.db_manager = db_manager
         self.max_login_attempts = 3
         self.max_login_timeout_seconds = 30
@@ -114,35 +116,49 @@ class AuthService(AbstractAuthService):
         if self.current_user is not None:
             raise GeneralError("Oh no user already logged in, but trying to login ")
 
+        time_now = datetime.now()
         self.db_manager.open_session()
         try:
             user = self.db_manager.get_one(User, user_id)
+            if user is None:
+                # Generic error for login sequence
+                print("User is None")
+                raise InvalidPasswordOrIDError
+
             if not isinstance(user, User):
                 # Critical program error, this should be logged in error
                 # logs!
-                raise TypeError("Fetched record is not type of User")
+                raise TypeError(f"Fetched record is not type of User, but of {type(user)}")
 
-            if user is None:
-                # Generic error for login sequence
-                raise InvalidPasswordOrIDError
 
-            if not reset_login_attempts(user.last_login,
-                                        self.max_login_timeout_seconds):
-                raise LoginTimeoutError
-             
-            if is_too_many_login_attempts(user.login_attempts,
-                                          self.max_login_attempts): 
+            # 1) Last login None -> First time login
+            # 2) If login_timeout -> Raise LoginTimeOutError
+            # 3) If TooManyLoginAttempts -> Set loginTimeout to max_time
+            # Check for too many login attempts first
+            if user.login_attempts == self.max_login_attempts:
+                user.login_attempts += 1
+                self.db_manager.commit()
                 raise TooManyLoginAttemptsError
 
-            if not verify_password(password, user.password):
-                # Generic error for login sequence
+            # Check if the current time is before the login timeout
+            if user.login_timeout and time_now < user.login_timeout:
                 user.login_attempts += 1
-                raise InvalidPasswordOrIDError
+                self.db_manager.commit()
+                raise LoginTimeoutError
 
-            # successsfull login
+            if not verify_password(password, user.password):
+                user.login_attempts += 1
+                if user.login_attempts >= self.max_login_attempts:
+                    # Set the login timeout on hitting the maximum failed attempts
+                    user.login_timeout = time_now + timedelta(seconds=self.max_login_timeout_seconds)
+                self.db_manager.commit()
+                raise InvalidPasswordOrIDError("Invalid user ID or password.")
+
+            # Successful login
             user.login_attempts = 0
-            user.last_login = datetime.now()
-            self.current_user = user
+            user.login_timeout = None
+            user.last_login = time_now
+            self.current_user = UserData(**user.to_dict())
             self.db_manager.commit()
 
         except SQLAlchemyError as e:
@@ -185,28 +201,8 @@ class AuthService(AbstractAuthService):
         user = self.current_user
         if user is not None:
             if permission in ROLE_PERMISSIONS.get(user.access_role, []):
+                print(permission)
                 return True
 
         return False
 
-    def create_super_admin(self):
-        self.db_manager.open_session()
-        admins = self.db_manager.session.query(User).filter(User.access_role == AccessRole.ADMIN).all()
-        if admins:
-            return "Super admin already exists."
-
-        super_admin = User(
-            first_name = "Anorak",
-            password = hash_password("Anorak"),
-            access_role = AccessRole.ADMIN
-        )
-
-        try:
-            self.db_manager.create(super_admin)
-            self.db_manager.commit()
-            return f"Super admin with id: {super_admin.id} created successfully."
-        except SQLAlchemyError as e:
-            self.db_manager.rollback()
-            return f"Failed to create super admin: {e}"
-        finally:
-            self.db_manager.close_session()

@@ -1,10 +1,10 @@
 from sqlalchemy.exc import SQLAlchemyError
 from frappster.auth import AbstractAuthService
 
-from frappster.models import User
+from frappster.models import Account, AccountData, User
 from frappster.database import AbstractDatabaseManager
 from frappster.types import AccessRole, Permissions
-from frappster.utils import hash_password, requires_permissions, requires_role
+from frappster.utils import gen_randomrange, hash_password, requires_permissions, requires_role
 from frappster.errors import (DatabaseError, 
                               PermissionDeniedError, 
                               UserNotFoundError,
@@ -26,6 +26,7 @@ class UserManager:
     @requires_role(AccessRole.EMPLOYEE)
     @requires_permissions(Permissions.MANAGE_USERS)
     def create_user(self, **kwargs) -> int:
+        # Only admins can create admin users
         if 'access_role' in kwargs and kwargs['access_role'] == AccessRole.ADMIN:
             if not self.auth_service.is_admin():
                 raise PermissionDeniedError
@@ -33,6 +34,8 @@ class UserManager:
         self.db_manager.open_session()
         try:
             new_user = User(**kwargs)
+
+            new_user.login_id = gen_randomrange()
             
             if 'password' in kwargs:
                 new_user.password = hash_password(kwargs['password'])
@@ -75,14 +78,13 @@ class UserManager:
             self.db_manager.close_session()
 
     @requires_role(AccessRole.ADMIN)
-    @requires_permissions(Permissions.MANAGE_USERS, Permissions.DELETE_USER)
+    @requires_permissions([Permissions.MANAGE_USERS, Permissions.DELETE_USER])
     def delete_user(self, user: User):
         if not self.auth_service.has_permission(Permissions.MANAGE_USERS):
             raise PermissionDeniedError
 
         if not self.auth_service.is_admin() and user.access_role == AccessRole.ADMIN:
             raise PermissionDeniedError
-
 
             
         pass
@@ -115,8 +117,28 @@ class AccountService:
 
     @requires_role(AccessRole.EMPLOYEE)
     @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.CREATE_ACCOUNT)
-    def create_account(self):
-        print("Creating account")
+    def create_account(self, **kwargs):
+        self.db_manager.open_session()
+        user_id = self.auth_service.current_user.id
+        try:
+            new_account = Account(**kwargs)
+
+            new_account.user_id = user_id
+
+            self.db_manager.create(new_account)
+            self.db_manager.commit()
+
+
+        except SQLAlchemyError as e:
+            self.db_manager.rollback()
+            raise DatabaseError(f"Database error occurred: {e}")
+
+        else:
+            print("Createeed account")
+            return True            
+
+        finally:
+            self.db_manager.close_session()
         pass
 
     @requires_role(AccessRole.EMPLOYEE)
@@ -129,7 +151,26 @@ class AccountService:
     @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.VIEW_ACCOUNT)
     def get_account_details(self):
         print("Getting account details")
-        pass
+        login_id = self.auth_service.current_user.login_id
+        self.db_manager.open_session()
+        
+        try:
+            user = self.db_manager.get_one(User, login_id)
+            if user is None:
+                raise UserNotFoundError
+
+            accounts = []
+            for account in user.accounts:
+                accounts.append(AccountData(**account.to_dict()))
+
+            return accounts
+
+        except SQLAlchemyError as e:
+            self.db_manager.rollback()
+            raise DatabaseError(f"Database error occurred: {e}")
+        finally:
+            self.db_manager.close_session()
+
 
 class TransactionService:
     """Handles transactions in the system"""
