@@ -149,7 +149,7 @@ class AccountService:
 
     @requires_role(AccessRole.EMPLOYEE)
     @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.VIEW_ACCOUNT)
-    def get_account_details(self):
+    def get_user_accounts(self, user:User | None = None):
         print("Getting account details")
         login_id = self.auth_service.current_user.login_id
         self.db_manager.open_session()

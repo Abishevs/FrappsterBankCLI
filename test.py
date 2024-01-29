@@ -10,13 +10,13 @@ from frappster.services import AccountService, UserManager
 from frappster.types import AccessRole, AccountType
 
 db_manager = DatabaseManager()
-db_manager.create_super_admin()
+# db_manager.create_super_admin()
 auth_service = AuthService(db_manager)
 account_service = AccountService(db_manager, auth_service)
 
-auth_service.login_user(42069, "securE")
+auth_service.login_user(42069, "secure")
 user_manager = UserManager(db_manager, auth_service)
-print(auth_service.current_user.first_name)
+# print(auth_service.current_user.first_name)
 # user_manager.get_user(auth_service.current_user.login_id)
 # user_manager.create_user(
 #         first_name="Samantha",
@@ -30,14 +30,21 @@ print(auth_service.current_user.first_name)
 #         )
 # auth_service.logout_user()
 # auth_service.login_user(4, "wade")
-# account_service.create_account(
-#         clearings_number=123,
-#         user_id=auth_service.current_user.id,
-#         account_number=334,
-#         account_type=AccountType.BUSINESS,
-#         balance=330
-#         )
-accounts = account_service.get_account_details()
+account_service.create_account(
+        clearings_number=123,
+        user_id=42069,
+        account_number=334,
+        account_type=AccountType.BUSINESS,
+        balance=330
+        )
+account_service.create_account(
+        clearings_number=124,
+        user_id=42069,
+        account_number=335,
+        account_type=AccountType.BUSINESS,
+        balance=3000
+        )
+accounts = account_service.get_user_accounts()
 # auth_service.logout_user()
 # auth_service.login_user(22, "alice")
 

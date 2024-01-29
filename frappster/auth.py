@@ -58,6 +58,11 @@ class AuthService(AbstractAuthService):
         self.max_login_attempts = 3
         self.max_login_timeout_seconds = 30
 
+    def get_logged_in_user(self) -> UserData:
+        if self.current_user is None:
+            raise UserNotLoggedInError
+        return self.current_user
+
     def update_own_password(self, old_password:str, new_password:str):
         self.db_manager.open_session()
         user = self.current_user
