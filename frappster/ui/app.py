@@ -84,8 +84,10 @@ class BankingApp:
 
     def show_error_dialog(self, error_message):
         def close_dialog():
-            if self.app.layout.container.floats is not None:
+            if self.app.layout.container.floats:
                 self.app.layout.container.floats.pop()
+
+            self.app.layout.focus(self.state.focused_widget)
 
         ok_button = Button(text="OK", handler=close_dialog)
 
@@ -94,9 +96,10 @@ class BankingApp:
             ok_button
         ])
 
-        dialog_frame = Frame(body=dialog_body, title="Error", style="bg:ansired")
+        dialog_frame = Frame(body=dialog_body, title="Error", style="bg:red")
 
         self.app.layout.container.floats.append(Float(dialog_frame))
+        self.state.focused_widget = dialog_frame
 
     def create_layout(self):
         self.root_container = FloatContainer(
@@ -115,12 +118,23 @@ class BankingApp:
     def handle_login(self, credentials):
         login_id, password = credentials
         try:
-            if self.auth_service.login_user(login_id, password):
-                print("hello")
-                self.switch_to_dashboard()
-
+            self.auth_service.login_user(login_id, password)
         except Exception as e:
+            self.state.focused_widget = self.login_screen.login_id_field
             self.show_error_dialog(str(e))
+            # self.switch_to_login()
+            # self.switch_to_dashboard()
+            # self.login_screen.login_id_field.text = ""
+            self.login_screen.password_field.text = ""
+        else:
+            self.switch_to_dashboard()
+
+    def switch_to_login(self):
+        login = self.create_initial_content()
+        self.main_content = login
+        self.app.layout = self.create_layout()
+
+        self.app.invalidate()
 
     def switch_to_dashboard(self):
         dashboard_layout = self.main_screen.create_layout()

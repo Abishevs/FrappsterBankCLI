@@ -122,7 +122,7 @@ class AuthService(AbstractAuthService):
             user = self.db_manager.get_one(User, user_id)
             if user is None:
                 # Generic error for login sequence
-                print("User is None")
+                # print("User is None")
                 raise InvalidPasswordOrIDError
 
             if not isinstance(user, User):
@@ -154,19 +154,18 @@ class AuthService(AbstractAuthService):
                 self.db_manager.commit()
                 raise InvalidPasswordOrIDError("Invalid user ID or password.")
 
-            # Successful login
-            user.login_attempts = 0
-            user.login_timeout = None
-            user.last_login = time_now
-            self.current_user = UserData(**user.to_dict())
-            self.db_manager.commit()
 
         except SQLAlchemyError as e:
             self.db_manager.rollback()
             raise DatabaseError(f"Database error occurred: {e}")
 
         else:
-            return True 
+            # Successful login
+            user.login_attempts = 0
+            user.login_timeout = None
+            user.last_login = time_now
+            self.current_user = UserData(**user.to_dict())
+            self.db_manager.commit()
 
         finally:
             self.db_manager.close_session()

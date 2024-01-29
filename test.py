@@ -14,7 +14,7 @@ db_manager.create_super_admin()
 auth_service = AuthService(db_manager)
 account_service = AccountService(db_manager, auth_service)
 
-auth_service.login_user(42069, "secure")
+auth_service.login_user(42069, "securE")
 user_manager = UserManager(db_manager, auth_service)
 print(auth_service.current_user.first_name)
 # user_manager.get_user(auth_service.current_user.login_id)
@@ -28,8 +28,8 @@ print(auth_service.current_user.first_name)
 #         password="wade",  
 #         access_role=AccessRole.EMPLOYEE
 #         )
-auth_service.logout_user()
-auth_service.login_user(4, "wade")
+# auth_service.logout_user()
+# auth_service.login_user(4, "wade")
 # account_service.create_account(
 #         clearings_number=123,
 #         user_id=auth_service.current_user.id,
@@ -38,8 +38,8 @@ auth_service.login_user(4, "wade")
 #         balance=330
 #         )
 accounts = account_service.get_account_details()
-auth_service.logout_user()
-auth_service.login_user(22, "alice")
+# auth_service.logout_user()
+# auth_service.login_user(22, "alice")
 
 
 console = Console()

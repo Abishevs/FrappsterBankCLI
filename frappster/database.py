@@ -75,6 +75,7 @@ class DatabaseManager(AbstractDatabaseManager):
         self.engine = create_engine(db_url, echo=echo)
         BaseModel.metadata.create_all(self.engine) 
         self.Session = sessionmaker(bind=self.engine)
+        self.create_super_admin()
 
     def create_super_admin(self):
         self.open_session()

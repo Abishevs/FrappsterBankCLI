@@ -2,7 +2,7 @@ from typing import List
 from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, Numeric
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import Enum as SQLEnum
@@ -85,7 +85,7 @@ class Account(BaseModel):
     clearings_number: Mapped[int] = mapped_column(Integer, nullable=False)
     account_number: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     account_type: Mapped[AccountType] = mapped_column(SQLEnum(AccountType), nullable=False)
-    balance: Mapped[int] = mapped_column(Integer, default=0.0)
+    balance: Mapped[float] = mapped_column(Numeric, default=0.0)
     user_id: Mapped[int] = mapped_column(Integer, 
                                         ForeignKey('users.id'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
@@ -132,7 +132,7 @@ class Transaction(BaseModel):
     recipients_account_id: Mapped["Account"] = mapped_column(Integer,
                                                     ForeignKey('accounts.id'))
     type: Mapped[str] = mapped_column(String(30))
-    amount: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[float] = mapped_column(Numeric)
     date: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
     # The cool stuff
