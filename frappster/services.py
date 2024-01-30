@@ -98,6 +98,8 @@ class UserManager:
             user = self.db_manager.get_one(User, user_id)
             if user is None:
                 raise UserNotFoundError
+            if not isinstance(user, User):
+                raise UserNotFoundError
             return user
 
         except SQLAlchemyError as e:
@@ -174,17 +176,35 @@ class AccountService:
 
 class TransactionService:
     """Handles transactions in the system"""
-    def __init__(self, db_manager:AbstractDatabaseManager) -> None:
+    def __init__(self,
+                 db_manager:AbstractDatabaseManager,
+                 user_manager: UserManager,
+                 ) -> None:
         self.db_manager = db_manager
+        self.user_manager = user_manager
 
-    def make_deposit(self):
+    def make_deposit(self, amount: float, account_id: int):
+        # 1) check if its users accounts
+        # 2) Then check if amount is float
+        # 3) Sheesh
         pass
 
-    def make_withdrawal(self):
+    def make_withdrawal(self, amount: float):
+        # 1) check if its users accounts
+        # 2) Then check if amount is float
+        # 3) Check if sufficent funds
         pass
 
     @requires_role(AccessRole.CUSTOMER)
     @requires_permissions(Permissions.MANAGE_ACCOUNTS, Permissions.INITIATE_OWN_TRANSACTION)
-    def initate_transaction(self, senders_account_id, recievers_account_id):
+    def iniate_transaction(self,
+                           senders_account_id:int,
+                           recievers_account_id:int,
+                           amount: float):
+        # 1) check if sender is current user
+        # 2) Check if reciever is valid
+        # 3) Check if sender amount is float
+        # 4) check if amount is sufficent 
+
         pass
 
