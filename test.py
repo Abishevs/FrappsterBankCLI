@@ -14,7 +14,8 @@ db_manager = DatabaseManager()
 auth_service = AuthService(db_manager)
 account_service = AccountService(db_manager, auth_service)
 
-auth_service.login_user(42069, "secure")
+auth_service.login_user(784431, "idk")
+# auth_service.login_user(42069, "secure")
 user_manager = UserManager(db_manager, auth_service)
 # print(auth_service.current_user.first_name)
 # user_manager.get_user(auth_service.current_user.login_id)
@@ -28,22 +29,23 @@ user_manager = UserManager(db_manager, auth_service)
 #         password="wade",  
 #         access_role=AccessRole.EMPLOYEE
 #         )
+print(id)
 # auth_service.logout_user()
 # auth_service.login_user(4, "wade")
-account_service.create_account(
-        clearings_number=123,
-        user_id=42069,
-        account_number=334,
-        account_type=AccountType.BUSINESS,
-        balance=330
-        )
-account_service.create_account(
-        clearings_number=124,
-        user_id=42069,
-        account_number=335,
-        account_type=AccountType.BUSINESS,
-        balance=3000
-        )
+# account_service.create_account(
+#         clearings_number=123,
+#         user_id=973015,
+#         account_number=334,
+#         account_type=AccountType.BUSINESS,
+#         balance=330
+#         )
+# account_service.create_account(
+#         clearings_number=124,
+#         user_id=42069,
+#         account_number=335,
+#         account_type=AccountType.SAVINGS,
+#         balance=3000
+#         )
 accounts = account_service.get_user_accounts()
 # auth_service.logout_user()
 # auth_service.login_user(22, "alice")

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import List
 from typing import Optional
 from datetime import datetime
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
 
-from frappster.types import AccessRole, AccountType
+from frappster.types import AccessRole, AccountType, TransactionType
 
 class BaseModel(DeclarativeBase):
     pass
@@ -41,12 +42,23 @@ class User(BaseModel):
     accounts: Mapped[List["Account"]] = relationship("Account", 
                                                      order_by="Account.id",
                                                      back_populates="user")
+    def from_dict(self, **kwargs):
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                raise AttributeError(f"Unknown: {key: value}")
+            setattr(self, key, value)
+
     def to_dict(self):
+        if self.middle_name is None:
+            middle_name = ""
+        else:
+            middle_name = self.middle_name
+
         data = {
             'id': self.id,
             'login_id': self.login_id,
             'first_name': self.first_name,
-            'middle_name': self.middle_name,
+            'middle_name': middle_name,
             'last_name': self.last_name,
             'address': self.address,
             'email': self.email,
@@ -85,7 +97,7 @@ class Account(BaseModel):
     clearings_number: Mapped[int] = mapped_column(Integer, nullable=False)
     account_number: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     account_type: Mapped[AccountType] = mapped_column(SQLEnum(AccountType), nullable=False)
-    balance: Mapped[float] = mapped_column(Numeric, default=0.0)
+    balance: Mapped[Decimal] = mapped_column(Numeric, default=0.0)
     user_id: Mapped[int] = mapped_column(Integer, 
                                         ForeignKey('users.id'))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
@@ -94,6 +106,18 @@ class Account(BaseModel):
     # The cool stuff
     user: Mapped["User"] = relationship("User",
                                         back_populates="accounts")
+    sent_transactions: Mapped[List["Transaction"]] = relationship(
+        'Transaction', 
+        foreign_keys='Transaction.senders_account_number',
+        primaryjoin="Transaction.senders_account_number == Account.account_number",
+        back_populates='sender_account'
+    )
+    received_transactions: Mapped[List["Transaction"]] = relationship(
+        'Transaction', 
+        foreign_keys='Transaction.recipients_account_number',
+        primaryjoin="Transaction.recipients_account_number == Account.account_number",
+        back_populates='recipient_account'
+    )
 
     def to_dict(self):
         data = {
@@ -125,18 +149,48 @@ class AccountData:
 
 class Transaction(BaseModel):
     __tablename__ = 'transactions'
+    # __allow_unmapped__ = True
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    senders_account_id: Mapped["Account"] = mapped_column(Integer,
-                                                  ForeignKey('accounts.id'))
-    recipients_account_id: Mapped["Account"] = mapped_column(Integer,
-                                                    ForeignKey('accounts.id'))
-    type: Mapped[str] = mapped_column(String(30))
-    amount: Mapped[float] = mapped_column(Numeric)
+    senders_account_number: Mapped[Optional[int]] = mapped_column(Integer,
+                                                                  ForeignKey('accounts.account_number'),
+                                                                  nullable=True,
+                                                                  default=None
+                                                                  )
+    recipients_account_number: Mapped[Optional[int]] = mapped_column(Integer,
+                                                                     ForeignKey('accounts.account_number'),
+                                                                     nullable=True,
+                                                                     default=None
+                                                                     )
+    type: Mapped[TransactionType] = mapped_column(SQLEnum(TransactionType),
+                                      nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric)
     date: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
     # The cool stuff
-    account: Mapped["Account"] = relationship("Account",
-                                              foreign_keys=[senders_account_id])
-    recipient: Mapped["Account"] = relationship("Account", 
-                                                foreign_keys=[recipients_account_id])
+    sender_account: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[senders_account_number],
+        primaryjoin="Transaction.senders_account_number == Account.account_number",
+        back_populates='sent_transactions'
+    )
+    recipient_account: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[recipients_account_number],
+        primaryjoin="Transaction.recipients_account_number == Account.account_number",
+        back_populates='received_transactions'
+    )
+
+    def to_dict(self):
+        sender = "-" if self.sender_account is None else self.sender_account.account_number
+        recipient = "-" if self.recipient_account is None else self.recipient_account.account_number
+
+        data = {
+            'id': self.id,
+            'sender_number': sender,
+            'recipient_number': recipient,
+            'type': self.type.name,  
+            'amount': round(self.amount, 2),
+            'date': self.date.isoformat()  
+        }
+        return data

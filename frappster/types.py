@@ -5,10 +5,21 @@ class AccountType(Enum):
     CHECKINGS = 20
     BUSINESS = 30
 
+    def __str__(self) -> str:
+        return self.name.lower().capitalize()
+
 class AccessRole(Enum):
     CUSTOMER = 1
     EMPLOYEE = 2
     ADMIN = 3
+
+    def __str__(self) -> str:
+        return self.name.lower().capitalize()
+
+class TransactionType(Enum):
+    TRANSFER = "transfer"
+    DEPOSIT = "deposit"
+    WITHDRAW = "withdraw"
 
 class Permissions(Enum):
     # User
@@ -58,6 +69,8 @@ ROLE_PERMISSIONS = {
     AccessRole.CUSTOMER: [Permissions.VIEW_OWN_TRANSACTIONS,
                           Permissions.INITIATE_OWN_TRANSACTION,
                           Permissions.UPDATE_OWN_USER,
+                          Permissions.VIEW_ACCOUNT,
+                          Permissions.VIEW_USER
                           ],
 }
  

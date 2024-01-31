@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -8,9 +6,7 @@ from frappster.database import DatabaseManager
 from frappster.models import User, UserData
 from frappster.types import ROLE_PERMISSIONS, AccessRole, Permissions
 from frappster.utils import (hash_password,
-                             verify_password,
-                             reset_login_attempts,
-                             is_too_many_login_attempts)
+                             verify_password)
 from frappster.errors import (DatabaseError,
                               GeneralError,
                               InvalidPasswordError,
@@ -21,34 +17,9 @@ from frappster.errors import (DatabaseError,
                               UserNotFoundError,
                               UserNotLoggedInError)
 
-class AbstractAuthService(ABC):
-    
-    @abstractmethod
-    def update_own_password(self, old_password:str, new_password:str) -> bool:
-        pass
-
-    @abstractmethod
-    def update_password(self, user_id: int, new_password:str) -> bool:
-        pass
-
-    @abstractmethod
-    def login_user(self, user_id:int, password:str) -> bool:
-        pass
-
-    @abstractmethod
-    def logout_user(self, user_id: Optional[int] = None) -> bool:
-        pass
-
-    @abstractmethod
-    def is_admin(self) -> bool:
-        pass
-
-    @abstractmethod
-    def has_permission(self, permission:Permissions) -> bool:
-        pass
 
 
-class AuthService(AbstractAuthService):
+class AuthService:
     """Handles user authenication &
     authorization for roll based access
     """
@@ -97,7 +68,7 @@ class AuthService(AbstractAuthService):
         self.db_manager.open_session()
         
         try:
-            fetched_user = self.db_manager.get_one(User, user_id)
+            fetched_user = self.db_manager.get_by_login_id(user_id)
             if not isinstance(fetched_user, User):
                 raise TypeError("Fetched record is not type of User")
 
@@ -124,7 +95,7 @@ class AuthService(AbstractAuthService):
         time_now = datetime.now()
         self.db_manager.open_session()
         try:
-            user = self.db_manager.get_one(User, user_id)
+            user = self.db_manager.get_by_login_id(user_id)
             if user is None:
                 # Generic error for login sequence
                 # print("User is None")
@@ -159,6 +130,10 @@ class AuthService(AbstractAuthService):
                 self.db_manager.commit()
                 raise InvalidPasswordOrIDError("Invalid user ID or password.")
 
+
+        except UserNotFoundError as e:
+            # Log error? not show details
+            raise InvalidPasswordOrIDError
 
         except SQLAlchemyError as e:
             self.db_manager.rollback()
@@ -205,7 +180,6 @@ class AuthService(AbstractAuthService):
         user = self.current_user
         if user is not None:
             if permission in ROLE_PERMISSIONS.get(user.access_role, []):
-                print(permission)
                 return True
 
         return False

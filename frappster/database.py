@@ -4,6 +4,7 @@ from typing import List, Optional, Type, Union
 from sqlalchemy import create_engine
 from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.orm.session import Session
+from frappster.errors import AccountNotFoundError, UserNotFoundError
 
 from frappster.models import Account, BaseModel, Transaction, User
 from frappster.types import AccessRole
@@ -49,16 +50,16 @@ class AbstractDatabaseManager(ABC):
                ):
         pass
 
-    @abstractmethod
-    def get_one(self,
-                model: Type[Union[User,
-                                  Account,
-                                  Transaction
-                                  ]],
-                record_id: int
-                ) -> Optional[Union[User, Account, Transaction]]:
-        """Reads db table given model & primary key"""
-        pass
+    # @abstractmethod
+    # def get_one(self,
+    #             model: Type[Union[User,
+    #                               Account,
+    #                               Transaction
+    #                               ]],
+    #             record_id: int
+    #             ) -> Optional[Union[User, Account, Transaction]]:
+    #     """Reads db table given model & primary key"""
+    #     pass
     
     @abstractmethod
     def get_all(self,
@@ -124,8 +125,27 @@ class DatabaseManager(AbstractDatabaseManager):
     def delete(self, record):
         self.session.delete(record)
 
-    def get_one(self, model, record_id):
-        return self.session.query(model).options(joinedload('*')).filter_by(login_id=record_id).first()
+    def get_by_id(self, model, model_id):
+        return self.session.query(model).get(model_id)
+
+    def get_by_login_id(self, login_id):
+        user = self.session.query(User).options(joinedload('*')).filter_by(login_id=login_id).first()
+        if user is None:
+            raise UserNotFoundError
+        return user
+
+    def get_by_account_number(self, account_number):
+        account = self.session.query(Account).options(joinedload('*')).filter(Account.account_number == account_number).first()
+        if account is None:
+            raise AccountNotFoundError
+        return account
+
+    def get_transactions_by_account_number(self, account_number):
+        account = self.session.query(Account).options(joinedload('*')).filter(Account.account_number == account_number).first()
+        if account is None:
+            raise AccountNotFoundError
+        transactions = self.session.query(Transaction).options(joinedload('*')).filter(Transaction.senders_account_number == account_number).all()
+        return transactions
 
     def get_all(self, model):
         return self.session.query(model).all()

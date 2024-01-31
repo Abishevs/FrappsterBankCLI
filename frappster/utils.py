@@ -1,9 +1,27 @@
 import bcrypt
 import random
+import decimal
+from decimal import Decimal
 from datetime import datetime, timedelta
 
-from frappster.errors import PermissionDeniedError
-from frappster.types import AccessRole
+from frappster.errors import InsufficientFundsError, InvalidAmountError, PermissionDeniedError
+
+def is_valid_amount(amount, available_funds: Decimal | None = None):
+    try:
+        amount = Decimal(str(amount))
+    except decimal.InvalidOperation:
+        raise InvalidAmountError
+
+    if amount < 0:
+        raise InvalidAmountError 
+
+    if amount == 0:
+        raise InvalidAmountError
+
+    if available_funds is not None:
+        if amount > available_funds:
+            raise InsufficientFundsError
+    return amount
 
 def hash_password(password):
     salt = bcrypt.gensalt()
@@ -57,11 +75,11 @@ def requires_permissions(*required_permissions):
             if not has_permision:
                 raise PermissionDeniedError
 
-            print("hhhhhhh")
             return func(self, *args, **kwargs)
         return wrapper
     return decorator
 
 def gen_randomrange(digits=6):
     return random.randrange(111111, 999999, digits)
+
 
